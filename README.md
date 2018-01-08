@@ -1,5 +1,7 @@
 # The F# Language, Library, and  Visual F# Tools Repository
 
+## 此版本增加了序列(字符串/列表/数组)的类似python的切片越界如 arr[..(-1)] 不再抛出异常. 
+
 You are invited to help produce future releases of the F# language compiler, library, and tools. This repository enables development on Linux, macOS and Windows, along with some automated CI testing for these.
 
 * [About F#](http://fsharp.org)
