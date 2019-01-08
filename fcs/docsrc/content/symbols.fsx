@@ -109,8 +109,8 @@ fnVal.CurriedParameterGroups.[0].[0].Name // "x"
 fnVal.CurriedParameterGroups.[0].[1].Name // "y"
 fnVal.DeclarationLocation.StartLine // 3
 fnVal.DisplayName // "foo"
-fnVal.EnclosingEntity.DisplayName // "Test"
-fnVal.EnclosingEntity.DeclarationLocation.StartLine // 1
+fnVal.DeclaringEntity.DisplayName // "Test"
+fnVal.DeclaringEntity.DeclarationLocation.StartLine // 1
 fnVal.GenericParameters.Count // 0
 fnVal.InlineAnnotation // FSharpInlineAnnotation.OptionalInline
 fnVal.IsActivePattern // false
@@ -168,8 +168,8 @@ used in the compilation, called the `ProjectContext`:
 *)
 let projectContext = checkFileResults.ProjectContext
     
-for ass in projectContext.GetReferencedAssemblies() do
-    match ass.FileName with 
+for assembly in projectContext.GetReferencedAssemblies() do
+    match assembly.FileName with 
     | None -> printfn "compilation referenced an assembly without a file" 
     | Some s -> printfn "compilation references assembly '%s'" s
     

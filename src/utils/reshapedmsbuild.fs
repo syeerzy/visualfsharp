@@ -85,6 +85,10 @@ module internal MsBuildAdapters =
     | Version46 = 7
     | Version461 = 8
     | Version452 = 9
+    | Version462 = 10
+    | Version47 = 11
+    | Version471 = 12
+    | Version472 = 13
     | VersionLatest = 8  //TargetDotNetFrameworkVersion.Version461
 
     /// <summary>
@@ -218,8 +222,7 @@ module internal ToolLocationHelper =
         let dotNetFrameworkFolderPrefix = dotNetFrameworkVersionFolderPrefix
         let frameworkName = FrameworkName(dotNetFrameworkIdentifier, version)
 
-#if FX_NO_WIN_REGISTRY
-#else
+#if !FX_NO_WIN_REGISTRY
         let findRegistryValueUnderKey registryBaseKeyName registryKeyName registryView =
          try
             use baseKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, registryView)

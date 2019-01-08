@@ -36,16 +36,16 @@ type PickledDataWithReferences<'rawData> =
     { /// The data that uses a collection of CcuThunks internally
       RawData: 'rawData
       /// The assumptions that need to be fixed up
-      FixupThunks: list<CcuThunk> } 
+      FixupThunks: CcuThunk [] } 
 
     member x.Fixup loader =
-        x.FixupThunks |> List.iter (fun reqd -> reqd.Fixup(loader reqd.AssemblyName))
+        x.FixupThunks |> Array.iter (fun reqd -> reqd.Fixup(loader reqd.AssemblyName))
         x.RawData
 
     /// Like Fixup but loader may return None, in which case there is no fixup.
     member x.OptionalFixup loader =
         x.FixupThunks 
-        |> List.iter(fun reqd->
+        |> Array.iter(fun reqd->
             match loader reqd.AssemblyName with 
             | Some(loaded) -> reqd.Fixup(loaded)
             | None -> reqd.FixupOrphaned() )
@@ -113,13 +113,14 @@ type WriterState =
   { os: ByteBuffer 
     oscope: CcuThunk
     occus: Table<CcuReference> 
-    otycons: NodeOutTable<EntityData,Entity> 
+    oentities: NodeOutTable<EntityData,Entity> 
     otypars: NodeOutTable<TyparData,Typar> 
     ovals: NodeOutTable<ValData,Val>
+    oanoninfos: NodeOutTable<AnonRecdTypeInfo,AnonRecdTypeInfo>
     ostrings: Table<string> 
     opubpaths: Table<int[]> 
     onlerefs: Table<int * int[]> 
-    osimpletyps: Table<int>
+    osimpletys: Table<int>
     oglobals : TcGlobals
     ofile : string
     /// Indicates if we are using in-memory format, where we store XML docs as well
@@ -144,13 +145,14 @@ type ReaderState =
   { is: ByteStream 
     iilscope: ILScopeRef
     iccus: InputTable<CcuThunk> 
-    itycons: NodeInTable<EntityData,Tycon>  
+    ientities: NodeInTable<EntityData,Tycon>  
     itypars: NodeInTable<TyparData,Typar> 
     ivals: NodeInTable<ValData,Val>
+    ianoninfos: NodeInTable<AnonRecdTypeInfo,AnonRecdTypeInfo>
     istrings: InputTable<string>
     ipubpaths: InputTable<PublicPath> 
     inlerefs: InputTable<NonLocalEntityRef> 
-    isimpletyps: InputTable<TType>
+    isimpletys: InputTable<TType>
     ifile: string
     iILModule : ILModuleDef option // the Abstract IL metadata for the DLL being read
   }
@@ -317,10 +319,13 @@ let u_used_space1 f st =
 
 
 let inline  u_tup2 p1 p2 (st:ReaderState) = let a = p1 st in let b = p2 st in (a,b)
+
 let inline  u_tup3 p1 p2 p3 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in (a,b,c)
+
 let inline u_tup4 p1 p2 p3 p4 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in (a,b,c,d)
+
 let inline u_tup5 p1 p2 p3 p4 p5 (st:ReaderState) =
   let a = p1 st 
   let b = p2 st 
@@ -328,32 +333,41 @@ let inline u_tup5 p1 p2 p3 p4 p5 (st:ReaderState) =
   let d = p4 st 
   let e = p5 st 
   (a,b,c,d,e)
+
 let inline u_tup6 p1 p2 p3 p4 p5 p6 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in let e = p5 st in let f = p6 st in (a,b,c,d,e,f)
+
 let inline u_tup7 p1 p2 p3 p4 p5 p6 p7 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in let e = p5 st in let f = p6 st in let x7 = p7 st in (a,b,c,d,e,f,x7)
+
 let inline u_tup8 p1 p2 p3 p4 p5 p6 p7 p8 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in let e = p5 st in let f = p6 st in let x7 = p7 st in let x8 = p8 st in  (a,b,c,d,e,f,x7,x8)
+
 let inline u_tup9 p1 p2 p3 p4 p5 p6 p7 p8 p9 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in let e = p5 st in let f = p6 st in let x7 = p7 st in let x8 = p8 st in let x9 = p9 st in (a,b,c,d,e,f,x7,x8,x9)
+
 let inline u_tup10 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in
   let e = p5 st in let f = p6 st in let x7 = p7 st in let x8 = p8 st in
   let x9 = p9 st in let x10 = p10 st in (a,b,c,d,e,f,x7,x8,x9,x10)
+
 let inline u_tup11 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in
   let e = p5 st in let f = p6 st in let x7 = p7 st in let x8 = p8 st in
   let x9 = p9 st in let x10 = p10 st in let x11 = p11 st in (a,b,c,d,e,f,x7,x8,x9,x10,x11)
+
 let inline u_tup12 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in
   let e = p5 st in let f = p6 st in let x7 = p7 st in let x8 = p8 st in
   let x9 = p9 st in let x10 = p10 st in let x11 = p11 st in let x12 = p12 st in
   (a,b,c,d,e,f,x7,x8,x9,x10,x11,x12)
+
 let inline u_tup13 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in
   let e = p5 st in let f = p6 st in let x7 = p7 st in let x8 = p8 st in
   let x9 = p9 st in let x10 = p10 st in let x11 = p11 st in let x12 = p12 st in let x13 = p13 st in
   (a,b,c,d,e,f,x7,x8,x9,x10,x11,x12,x13)
+
 let inline u_tup14 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 (st:ReaderState) =
   let a = p1 st in let b = p2 st in let c = p3 st in let d = p4 st in
   let e = p5 st in let f = p6 st in let x7 = p7 st in let x8 = p8 st in
@@ -391,7 +405,7 @@ let inline u_tup17 p1 p2 p3 p4 p5 p6 p7 p8 p9 p10 p11 p12 p13 p14 p15 p16 p17 (s
 // ctxt is for debugging
 let p_osgn_ref (_ctxt:string) (outMap : NodeOutTable<_,_>) x st = 
     let idx = outMap.Table.FindOrAdd (outMap.NodeStamp x)
-    //if ((idx = 0) && outMap.Name = "otycons") then 
+    //if ((idx = 0) && outMap.Name = "oentities") then 
     //    System.Diagnostics.Debug.Assert(false, sprintf "idx %d#%d in table %s has name '%s', was defined at '%s' and is referenced from context %s\n" idx (outMap.NodeStamp x) outMap.Name (outMap.NodeName x) (stringOfRange (outMap.GetRange x)) _ctxt)
     p_int idx st
 
@@ -447,9 +461,21 @@ let p_array_ext extraf f (x: 'T[]) st =
     | Some f -> f st
     p_array_core f x st
 
- 
-let p_list f x st = p_array f (Array.ofList x) st
-let p_list_ext extraf f x st = p_array_ext extraf f (Array.ofList x) st
+let p_list_core f (xs: 'T list) st =
+    for x in xs do
+        f x st
+
+let p_list f x st = 
+    p_int (List.length x) st
+    p_list_core f x st
+let p_list_ext extraf f x st = 
+    let n = List.length x
+    let n = if Option.isSome extraf then n ||| 0x80000000 else n
+    p_int n st
+    match extraf with 
+    | None -> ()
+    | Some f -> f st
+    p_list_core f x st
 
 let p_List f (x: 'T list) st = p_list f x st 
 
@@ -479,7 +505,7 @@ let private p_lazy_impl p v st =
     let fixupPos7 = st.os.Position
     prim_p_int32 0 st
     let idx1 = st.os.Position
-    let otyconsIdx1 = st.otycons.Size
+    let otyconsIdx1 = st.oentities.Size
     let otyparsIdx1 = st.otypars.Size
     let ovalsIdx1 = st.ovals.Size
     // Run the pickler
@@ -488,7 +514,7 @@ let private p_lazy_impl p v st =
     let idx2 = st.os.Position
     st.os.FixupInt32 fixupPos1 (idx2-idx1)
     // Determine and fixup the ranges of OSGN nodes defined within the lazy portion
-    let otyconsIdx2 = st.otycons.Size
+    let otyconsIdx2 = st.oentities.Size
     let otyparsIdx2 = st.otypars.Size
     let ovalsIdx2 = st.ovals.Size
     st.os.FixupInt32 fixupPos2 otyconsIdx1
@@ -505,8 +531,12 @@ let p_maybe_lazy p (x: MaybeLazy<_>) st =
     p_lazy_impl p x.Value st
 
 let p_hole () = 
-    let h = ref (None : 'T pickler option)
+    let h = ref (None : ('T -> WriterState -> unit) option)
     (fun f -> h := Some f),(fun x st -> match !h with Some f -> f x st | None -> pfailwith st "p_hole: unfilled hole")
+
+let p_hole2 () = 
+    let h = ref (None : ('Arg -> 'T -> WriterState -> unit) option)
+    (fun f -> h := Some f),(fun arg x st -> match !h with Some f -> f arg x st | None -> pfailwith st "p_hole2: unfilled hole")
 
 let u_array_core f n st =
     let res = Array.zeroCreate n
@@ -530,8 +560,22 @@ let u_array_ext extraf f st =
     let arr = u_array_core f (n &&& 0x7FFFFFFF) st
     extraItem, arr
 
-let u_list f st = Array.toList (u_array f st)
-let u_list_ext extra f st = let v, res = u_array_ext extra f st in v, Array.toList res
+let u_list_core f n st =
+    [ for _ in 1..n do
+         yield f st ]
+
+let u_list f st = 
+    let n = u_int st
+    u_list_core f n st
+let u_list_ext extra f st = 
+    let n = u_int st
+    let extraItem = 
+        if n &&& 0x80000000 = 0x80000000 then 
+            Some (extra st)
+        else
+            None
+    let list = u_list_core f (n &&& 0x7FFFFFFF) st
+    extraItem, list
 
 #if FLAT_LIST_AS_LIST
 #else
@@ -554,7 +598,10 @@ let u_array_revi f st =
     res
 
 // Mark up default constraints with a priority in reverse order: last gets 0 etc. See comment on TyparConstraint.DefaultsTo 
-let u_list_revi f st = Array.toList (u_array_revi f st)
+let u_list_revi f st =
+    let n = u_int st
+    [ for i = 0 to n-1 do
+         yield f st (n-1-i) ]
  
  
 let u_wrap (f: 'U -> 'T) (u : 'U unpickler) : 'T unpickler = (fun st -> f (u st))
@@ -595,7 +642,7 @@ let u_lazy u st =
         lazy (let st = { st with is = st.is.CloneAndSeek idx1 }
               u st)
     /// Force the reading of the data as a "tripwire" for each of the OSGN thunks 
-    for i = otyconsIdx1 to otyconsIdx2-1 do wire (st.itycons.Get(i)) res done
+    for i = otyconsIdx1 to otyconsIdx2-1 do wire (st.ientities.Get(i)) res done
     for i = ovalsIdx1   to ovalsIdx2-1   do wire (st.ivals.Get(i))   res done
     for i = otyparsIdx1 to otyparsIdx2-1 do wire (st.itypars.Get(i)) res done
     res
@@ -665,7 +712,7 @@ let u_encoded_nleref = u_tup2 u_int (u_array u_int)
 let u_nleref st = lookup_uniq st st.inlerefs (u_int st)
 
 let encode_nleref ccuTab stringTab nlerefTab thisCcu (nleref: NonLocalEntityRef) = 
-#if EXTENSIONTYPING
+#if !NO_EXTENSIONTYPING
     // Remap references to statically-linked Entity nodes in provider-generated entities to point to the current assembly.
     // References to these nodes _do_ appear in F# assembly metadata, because they may be public.
     let nleref = 
@@ -686,61 +733,71 @@ let p_nleref x st = p_int (encode_nleref st.occus st.ostrings st.onlerefs st.osc
 // Simple types are types like "int", represented as TType(Ref_nonlocal(...,"int"),[]). 
 // A huge number of these occur in pickled F# data, so make them unique. 
 let decode_simpletyp st _ccuTab _stringTab nlerefTab a = TType_app(ERefNonLocal (lookup_nleref st nlerefTab a),[])
-let lookup_simpletyp st simpletypTab x = lookup_uniq st simpletypTab x
+let lookup_simpletyp st simpleTyTab x = lookup_uniq st simpleTyTab x
 let u_encoded_simpletyp st = u_int  st
-let u_simpletyp st = lookup_uniq st st.isimpletyps (u_int st)
-let encode_simpletyp ccuTab stringTab nlerefTab simpletypTab thisCcu a = encode_uniq simpletypTab (encode_nleref ccuTab stringTab nlerefTab thisCcu a)
+let u_encoded_anoninfo st = u_int  st
+let u_simpletyp st = lookup_uniq st st.isimpletys (u_int st)
+let encode_simpletyp ccuTab stringTab nlerefTab simpleTyTab thisCcu a = encode_uniq simpleTyTab (encode_nleref ccuTab stringTab nlerefTab thisCcu a)
 let p_encoded_simpletyp x st = p_int x st
-let p_simpletyp x st = p_int (encode_simpletyp st.occus st.ostrings st.onlerefs st.osimpletyps st.oscope x) st
+let p_encoded_anoninfo x st = p_int x st
+let p_simpletyp x st = p_int (encode_simpletyp st.occus st.ostrings st.onlerefs st.osimpletys st.oscope x) st
 
-type sizes = int * int * int 
 let pickleObjWithDanglingCcus inMem file g scope p x =
-  let ccuNameTab,(sizes: sizes),stringTab,pubpathTab,nlerefTab,simpletypTab,phase1bytes =
+  let ccuNameTab,(ntycons, ntypars, nvals, nanoninfos),stringTab,pubpathTab,nlerefTab,simpleTyTab,phase1bytes =
     let st1 = 
       { os = ByteBuffer.Create 100000 
         oscope=scope
         occus= Table<_>.Create "occus" 
-        otycons=NodeOutTable<_,_>.Create((fun (tc:Tycon) -> tc.Stamp),(fun tc -> tc.LogicalName),(fun tc -> tc.Range),(fun osgn -> osgn),"otycons") 
+        oentities=NodeOutTable<_,_>.Create((fun (tc:Tycon) -> tc.Stamp),(fun tc -> tc.LogicalName),(fun tc -> tc.Range),(fun osgn -> osgn),"otycons") 
         otypars=NodeOutTable<_,_>.Create((fun (tp:Typar) -> tp.Stamp),(fun tp -> tp.DisplayName),(fun tp -> tp.Range),(fun osgn -> osgn),"otypars") 
         ovals=NodeOutTable<_,_>.Create((fun (v:Val) -> v.Stamp),(fun v -> v.LogicalName),(fun v -> v.Range),(fun osgn -> osgn),"ovals")
+        oanoninfos=NodeOutTable<_,_>.Create((fun (v:AnonRecdTypeInfo) -> v.Stamp),(fun v -> string v.Stamp),(fun _ -> range0),id,"oanoninfos")
         ostrings=Table<_>.Create "ostrings"
         onlerefs=Table<_>.Create "onlerefs"  
         opubpaths=Table<_>.Create "opubpaths"  
-        osimpletyps=Table<_>.Create "osimpletyps"  
+        osimpletys=Table<_>.Create "osimpletys"  
         oglobals=g
         ofile=file
         oInMem=inMem }
     p x st1
     let sizes = 
-      st1.otycons.Size,
+      st1.oentities.Size,
       st1.otypars.Size,
-      st1.ovals.Size 
-    st1.occus, sizes, st1.ostrings, st1.opubpaths,st1.onlerefs, st1.osimpletyps, st1.os.Close()
-  let phase2data = (ccuNameTab.AsArray,sizes,stringTab.AsArray,pubpathTab.AsArray,nlerefTab.AsArray,simpletypTab.AsArray,phase1bytes)
+      st1.ovals.Size,
+      st1.oanoninfos.Size 
+    st1.occus, sizes, st1.ostrings, st1.opubpaths,st1.onlerefs, st1.osimpletys, st1.os.Close()
+
   let phase2bytes = 
     let st2 = 
      { os = ByteBuffer.Create 100000 
        oscope=scope
        occus= Table<_>.Create "occus (fake)" 
-       otycons=NodeOutTable<_,_>.Create((fun (tc:Tycon) -> tc.Stamp),(fun tc -> tc.LogicalName),(fun tc -> tc.Range),(fun osgn -> osgn),"otycons") 
+       oentities=NodeOutTable<_,_>.Create((fun (tc:Tycon) -> tc.Stamp),(fun tc -> tc.LogicalName),(fun tc -> tc.Range),(fun osgn -> osgn),"otycons") 
        otypars=NodeOutTable<_,_>.Create((fun (tp:Typar) -> tp.Stamp),(fun tp -> tp.DisplayName),(fun tp -> tp.Range),(fun osgn -> osgn),"otypars") 
        ovals=NodeOutTable<_,_>.Create((fun (v:Val) -> v.Stamp),(fun v -> v.LogicalName),(fun v -> v.Range),(fun osgn -> osgn),"ovals")
+       oanoninfos=NodeOutTable<_,_>.Create((fun (v:AnonRecdTypeInfo) -> v.Stamp),(fun v -> string v.Stamp),(fun _ -> range0),id,"oanoninfos")
        ostrings=Table<_>.Create "ostrings (fake)"
        opubpaths=Table<_>.Create "opubpaths (fake)"
        onlerefs=Table<_>.Create "onlerefs (fake)"
-       osimpletyps=Table<_>.Create "osimpletyps (fake)"
+       osimpletys=Table<_>.Create "osimpletys (fake)"
        oglobals=g
        ofile=file
        oInMem=inMem }
-    p_tup7
-      (p_array p_encoded_ccuref) 
-      (p_tup3 p_int p_int p_int) 
-      (p_array p_encoded_string) 
-      (p_array p_encoded_pubpath) 
-      (p_array p_encoded_nleref) 
-      (p_array p_encoded_simpletyp) 
-      p_bytes 
-      phase2data st2
+    p_array p_encoded_ccuref ccuNameTab.AsArray st2
+    // Add a 4th integer indicated by a negative 1st integer
+    let z1 = if nanoninfos > 0 then  -ntycons-1 else ntycons
+    p_int z1 st2
+    p_tup2 p_int p_int (ntypars, nvals) st2
+    if nanoninfos > 0 then 
+        p_int nanoninfos st2
+    p_tup5
+        (p_array p_encoded_string) 
+        (p_array p_encoded_pubpath) 
+        (p_array p_encoded_nleref) 
+        (p_array p_encoded_simpletyp) 
+        p_bytes 
+        (stringTab.AsArray,pubpathTab.AsArray,nlerefTab.AsArray,simpleTyTab.AsArray,phase1bytes)
+        st2
     st2.os.Close()
   phase2bytes
   
@@ -756,59 +813,62 @@ let unpickleObjWithDanglingCcus file ilscope (iILModule:ILModuleDef option) u (p
        { is = ByteStream.FromBytes (phase2bytes,0,phase2bytes.Length) 
          iilscope= ilscope
          iccus= new_itbl "iccus (fake)" [| |] 
-         itycons= NodeInTable<_,_>.Create (Tycon.NewUnlinked, (fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"itycons",0) 
+         ientities= NodeInTable<_,_>.Create (Tycon.NewUnlinked, (fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"itycons",0) 
          itypars= NodeInTable<_,_>.Create (Typar.NewUnlinked, (fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"itypars",0) 
          ivals  = NodeInTable<_,_>.Create (Val.NewUnlinked , (fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"ivals",0)
+         ianoninfos=NodeInTable<_,_>.Create(AnonRecdTypeInfo.NewUnlinked, (fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"ianoninfos",0);
          istrings = new_itbl "istrings (fake)" [| |] 
          inlerefs = new_itbl "inlerefs (fake)" [| |] 
          ipubpaths = new_itbl "ipubpaths (fake)" [| |] 
-         isimpletyps = new_itbl "isimpletyps (fake)" [| |] 
+         isimpletys = new_itbl "isimpletys (fake)" [| |] 
          ifile=file
          iILModule = iILModule }
-    let phase2data = 
-        u_tup7
-           (u_array u_encoded_ccuref) 
-           (u_tup3 u_int u_int u_int) 
-           (u_array u_encoded_string) 
-           (u_array u_encoded_pubpath) 
-           (u_array u_encoded_nleref) 
-           (u_array u_encoded_simpletyp) 
-           u_bytes st2
-    let ccuNameTab,sizes,stringTab,pubpathTab,nlerefTab,simpletypTab,phase1bytes = phase2data
+    let ccuNameTab = u_array u_encoded_ccuref st2
+    let z1 = u_int st2
+    let ntycons = if z1 < 0 then -z1-1 else z1
+    let ntypars, nvals = u_tup2 u_int u_int st2
+    let nanoninfos = if z1 < 0 then u_int st2 else 0
+    let stringTab,pubpathTab,nlerefTab,simpleTyTab,phase1bytes = 
+        u_tup5
+            (u_array u_encoded_string) 
+            (u_array u_encoded_pubpath) 
+            (u_array u_encoded_nleref) 
+            (u_array u_encoded_simpletyp) 
+            u_bytes 
+            st2
     let ccuTab       = new_itbl "iccus"       (Array.map (CcuThunk.CreateDelayed) ccuNameTab)
     let stringTab    = new_itbl "istrings"    (Array.map decode_string stringTab)
     let pubpathTab   = new_itbl "ipubpaths"   (Array.map (decode_pubpath st2 stringTab) pubpathTab)
     let nlerefTab    = new_itbl "inlerefs"    (Array.map (decode_nleref st2 ccuTab stringTab) nlerefTab)
-    let simpletypTab = new_itbl "isimpletyps" (Array.map (decode_simpletyp st2 ccuTab stringTab nlerefTab) simpletypTab)
-    let ((ntycons,ntypars,nvals) : sizes) = sizes
+    let simpletypTab = new_itbl "simpleTyTab" (Array.map (decode_simpletyp st2 ccuTab stringTab nlerefTab) simpleTyTab)
     let data = 
         let st1 = 
            { is = ByteStream.FromBytes (phase1bytes,0,phase1bytes.Length) 
              iccus=  ccuTab 
              iilscope= ilscope
-             itycons= NodeInTable<_,_>.Create(Tycon.NewUnlinked,(fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"itycons",ntycons) 
+             ientities= NodeInTable<_,_>.Create(Tycon.NewUnlinked,(fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"itycons",ntycons) 
              itypars= NodeInTable<_,_>.Create(Typar.NewUnlinked,(fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"itypars",ntypars) 
              ivals=   NodeInTable<_,_>.Create(Val.NewUnlinked  ,(fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"ivals",nvals)
+             ianoninfos=NodeInTable<_,_>.Create(AnonRecdTypeInfo.NewUnlinked, (fun osgn tg -> osgn.Link tg),(fun osgn -> osgn.IsLinked),"ianoninfos",nanoninfos);
              istrings = stringTab
              ipubpaths = pubpathTab
              inlerefs = nlerefTab
-             isimpletyps = simpletypTab
+             isimpletys = simpletypTab
              ifile=file 
              iILModule = iILModule }
         let res = u st1
-#if LAZY_UNPICKLE
-#else
-        check ilscope st1.itycons
+#if !LAZY_UNPICKLE
+        check ilscope st1.ientities
         check ilscope st1.ivals
         check ilscope st1.itypars
 #endif
         res
 
-    {RawData=data; FixupThunks=Array.toList ccuTab.itbl_rows }
+    {RawData=data; FixupThunks=ccuTab.itbl_rows }
     
 
 //=========================================================================
-// PART II *)
+// PART II
 //=========================================================================
 
 //---------------------------------------------------------------------------
@@ -819,7 +879,9 @@ let p_ILPublicKey x st =
     match x with 
     | PublicKey b      -> p_byte 0 st; p_bytes b st
     | PublicKeyToken b -> p_byte 1 st; p_bytes b st
+
 let p_ILVersion x st = p_tup4 p_uint16 p_uint16 p_uint16 p_uint16 x st
+
 let p_ILModuleRef (x:ILModuleRef) st = 
     p_tup3 p_string p_bool (p_option p_bytes) (x.Name,x.HasMetadata,x.Hash) st
 
@@ -943,18 +1005,21 @@ let rec u_ILType st =
     | 7 -> u_uint16 st                            |> mkILTyvarTy
     | 8 -> u_tup3 u_bool u_ILTypeRef u_ILType  st |> ILType.Modified 
     | _ -> ufailwith st "u_ILType"
+
 and u_ILTypes st = u_list u_ILType st
+
 and u_ILCallSig = u_wrap (fun (a,b,c) -> {CallingConv=a; ArgTypes=b; ReturnType=c}) (u_tup3 u_ILCallConv u_ILTypes u_ILType)
+
 and u_ILTypeSpec st = let a,b = u_tup2 u_ILTypeRef u_ILTypes st in ILTypeSpec.Create(a,b)
 
 
-let p_ILMethodRef (x: ILMethodRef) st = p_tup6 p_ILTypeRef p_ILCallConv p_int p_string p_ILTypes p_ILType (x.EnclosingTypeRef,x.CallingConv,x.GenericArity,x.Name,x.ArgTypes,x.ReturnType) st
+let p_ILMethodRef (x: ILMethodRef) st = p_tup6 p_ILTypeRef p_ILCallConv p_int p_string p_ILTypes p_ILType (x.DeclaringTypeRef,x.CallingConv,x.GenericArity,x.Name,x.ArgTypes,x.ReturnType) st
 
-let p_ILFieldRef (x: ILFieldRef) st = p_tup3 p_ILTypeRef p_string p_ILType (x.EnclosingTypeRef, x.Name, x.Type) st
+let p_ILFieldRef (x: ILFieldRef) st = p_tup3 p_ILTypeRef p_string p_ILType (x.DeclaringTypeRef, x.Name, x.Type) st
 
-let p_ILMethodSpec (x: ILMethodSpec) st = p_tup3 p_ILMethodRef p_ILType p_ILTypes (x.MethodRef, x.EnclosingType, x.GenericArgs) st
+let p_ILMethodSpec (x: ILMethodSpec) st = p_tup3 p_ILMethodRef p_ILType p_ILTypes (x.MethodRef, x.DeclaringType, x.GenericArgs) st
 
-let p_ILFieldSpec (x : ILFieldSpec) st = p_tup2 p_ILFieldRef p_ILType (x.FieldRef, x.EnclosingType) st
+let p_ILFieldSpec (x : ILFieldSpec) st = p_tup2 p_ILFieldRef p_ILType (x.FieldRef, x.DeclaringType) st
 
 let p_ILBasicType x st = 
     p_int (match x with 
@@ -982,7 +1047,7 @@ let u_ILMethodRef st =
 
 let u_ILFieldRef st = 
     let x1,x2,x3 = u_tup3 u_ILTypeRef u_string u_ILType st 
-    {EnclosingTypeRef=x1;Name=x2;Type=x3}
+    {DeclaringTypeRef=x1;Name=x2;Type=x3}
 
 let u_ILMethodSpec st = 
     let x1,x2,x3 = u_tup3 u_ILMethodRef u_ILType u_ILTypes st 
@@ -990,7 +1055,7 @@ let u_ILMethodSpec st =
 
 let u_ILFieldSpec st = 
     let x1,x2 = u_tup2 u_ILFieldRef u_ILType st 
-    {FieldRef=x1;EnclosingType=x2}
+    {FieldRef=x1;DeclaringType=x2}
 
 let u_ILBasicType st = 
     match u_int st with  
@@ -1240,7 +1305,7 @@ let p_local_item_ref ctxt tab st = p_osgn_ref ctxt tab st
 
 let p_tcref ctxt (x:EntityRef) st = 
     match x with 
-    | ERefLocal x -> p_byte 0 st; p_local_item_ref ctxt st.otycons x st
+    | ERefLocal x -> p_byte 0 st; p_local_item_ref ctxt st.oentities x st
     | ERefNonLocal x -> p_byte 1 st; p_nleref x st
 
 let p_ucref (UCRef(a,b)) st = p_tup2 (p_tcref "ucref") p_string (a,b) st
@@ -1252,7 +1317,7 @@ let u_local_item_ref tab st = u_osgn_ref tab st
 let u_tcref st = 
     let tag = u_byte st
     match tag with
-    | 0 -> u_local_item_ref st.itycons  st |> ERefLocal 
+    | 0 -> u_local_item_ref st.ientities  st |> ERefLocal 
     | 1 -> u_nleref                     st |> ERefNonLocal 
     | _ -> ufailwith st "u_item_ref"
     
@@ -1263,10 +1328,19 @@ let u_rfref st = let a,b = u_tup2 u_tcref u_string st in RFRef(a,b)
 let u_tpref st = u_local_item_ref st.itypars st
 
 // forward reference
-let fill_p_typ,p_typ = p_hole()
-let p_typs = (p_list p_typ)
+let fill_p_ty2,p_ty2 = p_hole2()
+
+let p_ty = p_ty2 false
+let p_tys = (p_list p_ty)
 
 let fill_p_attribs,p_attribs = p_hole()
+
+// In F# 4.5, the type of the "this" pointer for structs is considered to be inref for the purposes of checking the implementation
+// of the struct.  However for backwards compat reaons we can't serialize this as the type.
+let checkForInRefStructThisArg st ty = 
+    let g = st.oglobals
+    let _, tauTy = tryDestForallTy g ty
+    isFunTy g tauTy && isFunTy g (rangeOfFunTy g tauTy) && isInByrefTy g (domainOfFunTy g tauTy)
 
 let p_nonlocal_val_ref (nlv:NonLocalValOrMemberRef) st =
     let a = nlv.EnclosingEntity
@@ -1277,7 +1351,11 @@ let p_nonlocal_val_ref (nlv:NonLocalValOrMemberRef) st =
     p_bool pkey.MemberIsOverride st 
     p_string pkey.LogicalName st 
     p_int pkey.TotalArgCount st 
-    p_option p_typ key.TypeForLinkage st
+    let isStructThisArgPos = 
+        match key.TypeForLinkage with 
+        | None -> false
+        | Some ty -> checkForInRefStructThisArg st ty
+    p_option (p_ty2 isStructThisArgPos) key.TypeForLinkage st
 
 let rec p_vref ctxt x st = 
     match x with 
@@ -1286,8 +1364,8 @@ let rec p_vref ctxt x st =
 
 let p_vrefs ctxt = p_list (p_vref ctxt) 
 
-let fill_u_typ,u_typ = u_hole()
-let u_typs = (u_list u_typ)
+let fill_u_ty,u_ty = u_hole()
+let u_tys = (u_list u_ty)
 let fill_u_attribs,u_attribs = u_hole()
 
 let u_nonlocal_val_ref st : NonLocalValOrMemberRef = 
@@ -1296,7 +1374,7 @@ let u_nonlocal_val_ref st : NonLocalValOrMemberRef =
     let b2 = u_bool st
     let b3 = u_string st
     let c = u_int st
-    let d = u_option u_typ st
+    let d = u_option u_ty st
     { EnclosingEntity = a
       ItemKey=ValLinkageFullKey({ MemberParentMangledName=b1; MemberIsOverride=b2;LogicalName=b3; TotalArgCount=c }, d) }
   
@@ -1357,50 +1435,71 @@ let u_MemberFlags st =
 let fill_u_Expr_hole,u_expr_fwd = u_hole()
 let fill_p_Expr_hole,p_expr_fwd = p_hole()
 
+let p_anonInfo_data (anonInfo: AnonRecdTypeInfo) st = 
+    p_tup3 p_ccuref p_bool (p_array p_ident) (anonInfo.Assembly, evalTupInfoIsStruct anonInfo.TupInfo, anonInfo.SortedIds) st
+
+let p_anonInfo x st = 
+    p_osgn_decl st.oanoninfos p_anonInfo_data x st
+
 let p_trait_sln sln st = 
     match sln with 
     | ILMethSln(a,b,c,d) ->
-         p_byte 0 st; p_tup4 p_typ (p_option p_ILTypeRef) p_ILMethodRef p_typs (a,b,c,d) st
+         p_byte 0 st; p_tup4 p_ty (p_option p_ILTypeRef) p_ILMethodRef p_tys (a,b,c,d) st
     | FSMethSln(a,b,c) ->
-         p_byte 1 st; p_tup3 p_typ (p_vref "trait") p_typs (a,b,c) st
+         p_byte 1 st; p_tup3 p_ty (p_vref "trait") p_tys (a,b,c) st
     | BuiltInSln -> 
          p_byte 2 st
     | ClosedExprSln expr -> 
          p_byte 3 st; p_expr_fwd expr st
     | FSRecdFieldSln(a,b,c) ->
-         p_byte 4 st; p_tup3 p_typs p_rfref p_bool (a,b,c) st
+         p_byte 4 st; p_tup3 p_tys p_rfref p_bool (a,b,c) st
+    | FSAnonRecdFieldSln(a, b, c) ->
+         p_byte 5 st; p_tup3 p_anonInfo p_tys p_int (a,b,c) st
+
 
 let p_trait (TTrait(a,b,c,d,e,f)) st  = 
-    p_tup6 p_typs p_string p_MemberFlags p_typs (p_option p_typ) (p_option p_trait_sln) (a,b,c,d,e,!f) st
+    p_tup6 p_tys p_string p_MemberFlags p_tys (p_option p_ty) (p_option p_trait_sln) (a,b,c,d,e,!f) st
+
+let u_anonInfo_data st = 
+    let (ccu, info, nms) = u_tup3 u_ccuref u_bool (u_array u_ident) st 
+    AnonRecdTypeInfo.Create (ccu, mkTupInfo info, nms)
+
+let u_anonInfo st = 
+    u_osgn_decl st.ianoninfos u_anonInfo_data st 
 
 // We have to store trait solutions since they can occur in optimization data
 let u_trait_sln st = 
     let tag = u_byte st
     match tag with 
     | 0 -> 
-        let (a,b,c,d) = u_tup4 u_typ (u_option u_ILTypeRef) u_ILMethodRef u_typs st
+        let (a,b,c,d) = u_tup4 u_ty (u_option u_ILTypeRef) u_ILMethodRef u_tys st
         ILMethSln(a,b,c,d) 
     | 1 -> 
-        let (a,b,c) = u_tup3 u_typ u_vref u_typs st
+        let (a,b,c) = u_tup3 u_ty u_vref u_tys st
         FSMethSln(a,b,c)
     | 2 -> 
         BuiltInSln
     | 3 -> 
         ClosedExprSln (u_expr_fwd st)
     | 4 -> 
-        let (a,b,c) = u_tup3 u_typs u_rfref u_bool st
+        let (a,b,c) = u_tup3 u_tys u_rfref u_bool st
         FSRecdFieldSln(a,b,c) 
+    | 5 -> 
+         let (a,b,c) = u_tup3 u_anonInfo u_tys u_int st
+         FSAnonRecdFieldSln(a, b, c)
     | _ -> ufailwith st "u_trait_sln" 
 
 let u_trait st = 
-    let a,b,c,d,e,f = u_tup6 u_typs u_string u_MemberFlags u_typs (u_option u_typ) (u_option u_trait_sln) st
+    let a,b,c,d,e,f = u_tup6 u_tys u_string u_MemberFlags u_tys (u_option u_ty) (u_option u_trait_sln) st
     TTrait (a,b,c,d,e,ref f)
 
 
 let p_rational q st = p_int32 (GetNumerator q) st; p_int32 (GetDenominator q) st
 
 let p_measure_con tcref st = p_byte 0 st; p_tcref "measure" tcref st
+
 let p_measure_var v st = p_byte 3 st; p_tpref v st
+
 let p_measure_one = p_byte 4
 
 // Pickle a unit-of-measure variable or constructor
@@ -1464,107 +1563,129 @@ let rec u_measure_expr st =
     | 5 -> let a = u_measure_expr st in let b = u_rational st in Measure.RationalPower (a,b)
     | _ -> ufailwith st "u_measure_expr"
 
-let p_typar_constraint x st = 
+let p_tyar_constraint x st = 
     match x with 
-    | TyparConstraint.CoercesTo (a,_)               -> p_byte 0 st; p_typ a st
+    | TyparConstraint.CoercesTo (a,_)               -> p_byte 0 st; p_ty a st
     | TyparConstraint.MayResolveMember(traitInfo,_) -> p_byte 1 st; p_trait traitInfo st
-    | TyparConstraint.DefaultsTo(_,rty,_)           -> p_byte 2 st; p_typ rty st
+    | TyparConstraint.DefaultsTo(_,rty,_)           -> p_byte 2 st; p_ty rty st
     | TyparConstraint.SupportsNull _                -> p_byte 3 st
     | TyparConstraint.IsNonNullableStruct _         -> p_byte 4 st
     | TyparConstraint.IsReferenceType _             -> p_byte 5 st
     | TyparConstraint.RequiresDefaultConstructor _  -> p_byte 6 st
-    | TyparConstraint.SimpleChoice(tys,_)           -> p_byte 7 st; p_typs tys st
-    | TyparConstraint.IsEnum(ty,_)                  -> p_byte 8 st; p_typ ty st
-    | TyparConstraint.IsDelegate(aty,bty,_)         -> p_byte 9 st; p_typ aty st; p_typ bty st
+    | TyparConstraint.SimpleChoice(tys,_)           -> p_byte 7 st; p_tys tys st
+    | TyparConstraint.IsEnum(ty,_)                  -> p_byte 8 st; p_ty ty st
+    | TyparConstraint.IsDelegate(aty,bty,_)         -> p_byte 9 st; p_ty aty st; p_ty bty st
     | TyparConstraint.SupportsComparison _          -> p_byte 10 st
     | TyparConstraint.SupportsEquality _            -> p_byte 11 st
     | TyparConstraint.IsUnmanaged _                 -> p_byte 12 st
-let p_typar_constraints = (p_list p_typar_constraint)
+let p_tyar_constraints = (p_list p_tyar_constraint)
 
-let u_typar_constraint st = 
+let u_tyar_constraint st = 
     let tag = u_byte st
     match tag with
-    | 0 -> u_typ  st             |> (fun a     _ -> TyparConstraint.CoercesTo (a,range0) )
+    | 0 -> u_ty  st             |> (fun a     _ -> TyparConstraint.CoercesTo (a,range0) )
     | 1 -> u_trait st            |> (fun a     _ -> TyparConstraint.MayResolveMember(a,range0))
-    | 2 -> u_typ st              |> (fun a  ridx -> TyparConstraint.DefaultsTo(ridx,a,range0))
+    | 2 -> u_ty st              |> (fun a  ridx -> TyparConstraint.DefaultsTo(ridx,a,range0))
     | 3 ->                          (fun       _ -> TyparConstraint.SupportsNull range0)
     | 4 ->                          (fun       _ -> TyparConstraint.IsNonNullableStruct range0)
     | 5 ->                          (fun       _ -> TyparConstraint.IsReferenceType range0)
     | 6 ->                          (fun       _ -> TyparConstraint.RequiresDefaultConstructor range0)
-    | 7 -> u_typs st             |> (fun a     _ -> TyparConstraint.SimpleChoice(a,range0))
-    | 8 -> u_typ  st             |> (fun a     _ -> TyparConstraint.IsEnum(a,range0))
-    | 9 -> u_tup2 u_typ u_typ st |> (fun (a,b) _ -> TyparConstraint.IsDelegate(a,b,range0))
+    | 7 -> u_tys st             |> (fun a     _ -> TyparConstraint.SimpleChoice(a,range0))
+    | 8 -> u_ty  st             |> (fun a     _ -> TyparConstraint.IsEnum(a,range0))
+    | 9 -> u_tup2 u_ty u_ty st |> (fun (a,b) _ -> TyparConstraint.IsDelegate(a,b,range0))
     | 10 ->                         (fun       _ -> TyparConstraint.SupportsComparison range0)
     | 11 ->                         (fun       _ -> TyparConstraint.SupportsEquality range0)
     | 12 ->                         (fun       _ -> TyparConstraint.IsUnmanaged range0)
-    | _ -> ufailwith st "u_typar_constraint" 
+    | _ -> ufailwith st "u_tyar_constraint" 
 
 
-let u_typar_constraints = (u_list_revi u_typar_constraint)
+let u_tyar_constraints = (u_list_revi u_tyar_constraint)
 
 
-let p_typar_spec_data (x:Typar) st = 
+let p_tyar_spec_data (x:Typar) st = 
     p_tup5
       p_ident 
       p_attribs
       p_int64
-      p_typar_constraints
+      p_tyar_constraints
       p_xmldoc
+      (x.typar_id,x.Attribs,int64 x.typar_flags.PickledBits,x.Constraints,x.XmlDoc) st
 
-      (x.typar_id,x.typar_attribs,int64 x.typar_flags.PickledBits,x.typar_constraints,x.typar_xmldoc) st
+let p_tyar_spec (x:Typar) st = 
+    //Disabled, workaround for bug 2721: if x.Rigidity <> TyparRigidity.Rigid then warning(Error(sprintf "p_tyar_spec: typar#%d is not rigid" x.Stamp, x.Range))
+    if x.IsFromError then warning(Error((0,"p_tyar_spec: from error"), x.Range))
+    p_osgn_decl st.otypars p_tyar_spec_data x st
 
-let p_typar_spec (x:Typar) st = 
-    //Disabled, workaround for bug 2721: if x.Rigidity <> TyparRigidity.Rigid then warning(Error(sprintf "p_typar_spec: typar#%d is not rigid" x.Stamp, x.Range))
-    if x.IsFromError then warning(Error((0,"p_typar_spec: from error"), x.Range))
-    p_osgn_decl st.otypars p_typar_spec_data x st
+let p_tyar_specs = (p_list p_tyar_spec)
 
-let p_typar_specs = (p_list p_typar_spec)
-
-let u_typar_spec_data st = 
-    let a,c,d,e,g = u_tup5 u_ident u_attribs u_int64 u_typar_constraints u_xmldoc st
+let u_tyar_spec_data st = 
+    let a,c,d,e,g = u_tup5 u_ident u_attribs u_int64 u_tyar_constraints u_xmldoc st
     { typar_id=a 
-      typar_il_name=None
       typar_stamp=newStamp()
-      typar_attribs=c
       typar_flags=TyparFlags(int32 d)
-      typar_constraints=e
       typar_solution=None
-      typar_xmldoc=g
-      typar_astype= Unchecked.defaultof<_> }
+      typar_astype= Unchecked.defaultof<_>
+      typar_opt_data=
+        match g, e, c with
+        | XmlDoc [||], [], [] -> None
+        | _ -> Some { typar_il_name = None; typar_xmldoc = g; typar_constraints = e; typar_attribs = c } }
 
-let u_typar_spec st = 
-    u_osgn_decl st.itypars u_typar_spec_data st 
+let u_tyar_spec st = 
+    u_osgn_decl st.itypars u_tyar_spec_data st 
 
-let u_typar_specs = (u_list u_typar_spec)
+let u_tyar_specs = (u_list u_tyar_spec)
 
-let _ = fill_p_typ (fun ty st ->
+let _ = fill_p_ty2 (fun isStructThisArgPos ty st ->
     let ty = stripTyparEqns ty
+
+    // See comment on 'checkForInRefStructThisArg'
+    let ty = 
+        if isInByrefTy st.oglobals ty && isStructThisArgPos then 
+            // Convert the inref to a byref 
+            mkByrefTy st.oglobals (destByrefTy st.oglobals ty) 
+        else
+            ty
+
     match ty with 
     | TType_tuple (tupInfo,l) -> 
           if evalTupInfoIsStruct tupInfo then 
-              p_byte 8 st; p_typs l st
+              p_byte 8 st; p_tys l st
           else
-              p_byte 0 st; p_typs l st
+              p_byte 0 st; p_tys l st
     | TType_app(ERefNonLocal nleref,[]) -> p_byte 1 st; p_simpletyp nleref st
-    | TType_app (tc,tinst)              -> p_byte 2 st; p_tup2 (p_tcref "typ") p_typs (tc,tinst) st
-    | TType_fun (d,r)                   -> p_byte 3 st; p_tup2 p_typ p_typ (d,r) st
+    | TType_app (tc,tinst)              -> p_byte 2 st; p_tup2 (p_tcref "typ") p_tys (tc,tinst) st
+    | TType_fun (d,r)                   -> 
+        p_byte 3 st
+        // Note, the "this" argument may be found in the domain position of a function type, so propagate the isStructThisArgPos value
+        p_ty2 isStructThisArgPos d st
+        p_ty r st
     | TType_var r                       -> p_byte 4 st; p_tpref r st
-    | TType_forall (tps,r)              -> p_byte 5 st; p_tup2 p_typar_specs p_typ (tps,r) st
+    | TType_forall (tps,r)              -> 
+        p_byte 5 st
+        p_tyar_specs tps st
+        // Note, the "this" argument may be found in the body of a generic forall type, so propagate the isStructThisArgPos value
+        p_ty2 isStructThisArgPos r st
     | TType_measure unt                 -> p_byte 6 st; p_measure_expr unt st
-    | TType_ucase (uc,tinst)            -> p_byte 7 st; p_tup2 p_ucref p_typs (uc,tinst) st)
+    | TType_ucase (uc,tinst)            -> p_byte 7 st; p_tup2 p_ucref p_tys (uc,tinst) st
+    // p_byte 8 taken by TType_tuple above
+    | TType_anon (anonInfo, l) -> 
+         p_byte 9 st
+         p_anonInfo anonInfo st
+         p_tys l st)
 
-let _ = fill_u_typ (fun st ->
+let _ = fill_u_ty (fun st ->
     let tag = u_byte st
     match tag with
-    | 0 -> let l = u_typs st                               in TType_tuple (tupInfoRef, l)
+    | 0 -> let l = u_tys st                               in TType_tuple (tupInfoRef, l)
     | 1 -> u_simpletyp st 
-    | 2 -> let tc = u_tcref st in let tinst = u_typs st    in TType_app (tc,tinst)
-    | 3 -> let d = u_typ st    in let r = u_typ st         in TType_fun (d,r)
+    | 2 -> let tc = u_tcref st in let tinst = u_tys st    in TType_app (tc,tinst)
+    | 3 -> let d = u_ty st    in let r = u_ty st         in TType_fun (d,r)
     | 4 -> let r = u_tpref st                              in r.AsType
-    | 5 -> let tps = u_typar_specs st in let r = u_typ st  in TType_forall (tps,r)
+    | 5 -> let tps = u_tyar_specs st in let r = u_ty st  in TType_forall (tps,r)
     | 6 -> let unt = u_measure_expr st                     in TType_measure unt
-    | 7 -> let uc = u_ucref st in let tinst = u_typs st    in TType_ucase (uc,tinst)
-    | 8 -> let l = u_typs st                               in TType_tuple (tupInfoStruct, l)
+    | 7 -> let uc = u_ucref st in let tinst = u_tys st    in TType_ucase (uc,tinst)
+    | 8 -> let l = u_tys st                               in TType_tuple (tupInfoStruct, l)
+    | 9 -> let anonInfo = u_anonInfo st in let l = u_tys st  in TType_anon (anonInfo, l)
     | _ -> ufailwith st "u_typ")
   
 
@@ -1641,12 +1762,12 @@ and p_tycon_repr x st =
     // The leading "p_byte 1" and "p_byte 0" come from the F# 2.0 format, which used an option value at this point.
     match x with 
     | TRecdRepr fs         -> p_byte 1 st; p_byte 0 st; p_rfield_table fs st; false
-    | TUnionRepr x         -> p_byte 1 st; p_byte 1 st; p_list p_unioncase_spec (Array.toList x.CasesTable.CasesByIndex) st; false
+    | TUnionRepr x         -> p_byte 1 st; p_byte 1 st; p_array p_unioncase_spec (x.CasesTable.CasesByIndex) st; false
     | TAsmRepr ilty        -> p_byte 1 st; p_byte 2 st; p_ILType ilty st; false
     | TFSharpObjectRepr r  -> p_byte 1 st; p_byte 3 st; p_tycon_objmodel_data r st; false
-    | TMeasureableRepr ty  -> p_byte 1 st; p_byte 4 st; p_typ ty st; false
+    | TMeasureableRepr ty  -> p_byte 1 st; p_byte 4 st; p_ty ty st; false
     | TNoRepr              -> p_byte 0 st; false
-#if EXTENSIONTYPING
+#if !NO_EXTENSIONTYPING
     | TProvidedTypeExtensionPoint info -> 
         if info.IsErased then 
             // Pickle erased type definitions as a NoRepr
@@ -1666,7 +1787,7 @@ and p_attribs_ext f x st = p_list_ext f p_attrib x st
 
 and p_unioncase_spec x st =                     
     p_rfield_table x.FieldTable st
-    p_typ x.ReturnType st
+    p_ty x.ReturnType st
     p_string x.CompiledName st
     p_ident x.Id st
     // The XmlDoc are only written for the extended in-memory format. We encode their presence using a marker bit here
@@ -1683,14 +1804,14 @@ and p_exnc_repr x st =
     | TExnFresh x      -> p_byte 2 st; p_rfield_table x st
     | TExnNone         -> p_byte 3 st
 
-and p_exnc_spec x st = p_tycon_spec x st
+and p_exnc_spec x st = p_entity_spec x st
 
 and p_access (TAccess n) st = p_list p_cpath n st
 
 and p_recdfield_spec x st = 
     p_bool x.rfield_mutable st
     p_bool x.rfield_volatile st
-    p_typ x.rfield_type st
+    p_ty x.rfield_type st
     p_bool x.rfield_static st
     p_bool x.rfield_secret st
     p_option p_const x.rfield_const st
@@ -1701,28 +1822,28 @@ and p_recdfield_spec x st =
     p_access x.rfield_access st
 
 and p_rfield_table x st = 
-    p_list p_recdfield_spec (Array.toList x.FieldsByIndex) st
+    p_array p_recdfield_spec (x.FieldsByIndex) st
 
 and p_entity_spec_data (x:Entity) st = 
-    p_typar_specs (x.entity_typars.Force(x.entity_range)) st 
+    p_tyar_specs (x.entity_typars.Force(x.entity_range)) st 
     p_string x.entity_logical_name st
-    p_option p_string x.entity_compiled_name st
+    p_option p_string x.EntityCompiledName st
     p_range  x.entity_range st
     p_option p_pubpath x.entity_pubpath st
-    p_access x.entity_accessiblity st
-    p_access  x.entity_tycon_repr_accessibility st
+    p_access x.Accessibility st
+    p_access  x.TypeReprAccessibility st
     p_attribs x.entity_attribs st
     let flagBit = p_tycon_repr x.entity_tycon_repr st
-    p_option p_typ x.entity_tycon_abbrev st
+    p_option p_ty x.TypeAbbrev st
     p_tcaug x.entity_tycon_tcaug st
-    p_string x.entity_xmldocsig st
-    p_kind x.entity_kind st
+    p_string System.String.Empty st
+    p_kind x.TypeOrMeasureKind st
     p_int64 (x.entity_flags.PickledBits ||| (if flagBit then EntityFlags.ReservedBitForPickleFormatTyconReprFlag else 0L)) st
     p_option p_cpath x.entity_cpath st
     p_maybe_lazy p_modul_typ x.entity_modul_contents st
-    p_exnc_repr x.entity_exn_info st
+    p_exnc_repr x.ExceptionInfo st
     if st.oInMem then
-        p_used_space1 (p_xmldoc x.entity_xmldoc) st
+        p_used_space1 (p_xmldoc x.XmlDoc) st
     else
         p_space 1 () st
 
@@ -1734,8 +1855,8 @@ and p_tcaug p st =
       (p_option (p_tup3 (p_vref "hash_obj") (p_vref "hash_withc") (p_vref "equals_withc")))
       (p_option (p_tup2 (p_vref "hash") (p_vref "equals")))
       (p_list (p_tup2 p_string (p_vref "adhoc"))) 
-      (p_list (p_tup3 p_typ p_bool p_dummy_range))
-      (p_option p_typ)
+      (p_list (p_tup3 p_ty p_bool p_dummy_range))
+      (p_option p_ty)
       p_bool
       (p_space 1)
       (p.tcaug_compare, 
@@ -1755,7 +1876,7 @@ and p_tcaug p st =
        p.tcaug_abstract,
        space) st
 
-and p_tycon_spec x st = p_osgn_decl st.otycons p_entity_spec_data x st
+and p_entity_spec x st = p_osgn_decl st.oentities p_entity_spec_data x st
 
 and p_parentref x st = 
     match x with 
@@ -1774,11 +1895,11 @@ and p_attrib_expr (AttribExpr(e1,e2)) st =
     p_tup2 p_expr p_expr (e1,e2) st
 
 and p_attrib_arg (AttribNamedArg(a,b,c,d)) st = 
-    p_tup4 p_string p_typ p_bool p_attrib_expr (a,b,c,d) st
+    p_tup4 p_string p_ty p_bool p_attrib_expr (a,b,c,d) st
 
 and p_member_info (x:ValMemberInfo) st = 
     p_tup4 (p_tcref "member_info")  p_MemberFlags (p_list p_slotsig) p_bool 
-        (x.ApparentParent,x.MemberFlags,x.ImplementedSlotSigs,x.IsImplemented) st
+        (x.ApparentEnclosingEntity,x.MemberFlags,x.ImplementedSlotSigs,x.IsImplemented) st
 
 and p_tycon_objmodel_kind x st = 
     match x with 
@@ -1807,25 +1928,28 @@ and p_vrefFlags x st =
     | NormalValUse -> p_byte 0 st
     | CtorValUsedAsSuperInit  -> p_byte 1 st
     | CtorValUsedAsSelfInit  -> p_byte 2 st
-    | PossibleConstrainedCall ty  -> p_byte 3 st; p_typ ty st
+    | PossibleConstrainedCall ty  -> p_byte 3 st; p_ty ty st
     | VSlotDirectCall -> p_byte 4 st
 
 and p_ValData x st =
     p_string x.val_logical_name st
-    p_option p_string x.val_compiled_name st
+    p_option p_string x.ValCompiledName st
     // only keep range information on published values, not on optimization data
-    p_ranges (if x.val_repr_info.IsSome then Some(x.val_range, x.DefinitionRange) else None) st
-    p_typ x.val_type st
+    p_ranges (x.ValReprInfo |> Option.map (fun _ -> x.val_range, x.DefinitionRange)) st
+    
+    let isStructThisArgPos = x.IsMember && checkForInRefStructThisArg st x.Type
+    p_ty2 isStructThisArgPos x.val_type st
+
     p_int64 x.val_flags.PickledBits st
-    p_option p_member_info x.val_member_info st
-    p_attribs x.val_attribs st
-    p_option p_ValReprInfo x.val_repr_info st
-    p_string x.val_xmldocsig st
-    p_access x.val_access st
-    p_parentref x.val_actual_parent st
-    p_option p_const x.val_const st
+    p_option p_member_info x.MemberInfo st
+    p_attribs x.Attribs st
+    p_option p_ValReprInfo x.ValReprInfo st
+    p_string x.XmlDocSig st
+    p_access x.Accessibility st
+    p_parentref x.DeclaringEntity st
+    p_option p_const x.LiteralValue st
     if st.oInMem then
-        p_used_space1 (p_xmldoc x.val_xmldoc) st
+        p_used_space1 (p_xmldoc x.XmlDoc) st
     else
         p_space 1 () st
       
@@ -1836,7 +1960,7 @@ and p_modul_typ (x: ModuleOrNamespaceType) st =
     p_tup3
       p_istype
       (p_qlist p_Val)
-      (p_qlist p_tycon_spec)
+      (p_qlist p_entity_spec)
       (x.ModuleOrNamespaceKind,x.AllValsAndMembers,x.AllEntities)
       st
 
@@ -1881,7 +2005,7 @@ and u_tycon_repr st =
             let v = u_tycon_objmodel_data  st 
             (fun _flagBit -> TFSharpObjectRepr v)
         | 4 -> 
-            let v = u_typ st 
+            let v = u_ty st 
             (fun _flagBit -> TMeasureableRepr v)
         | _ -> ufailwith st "u_tycon_repr"
     | _ -> ufailwith st "u_tycon_repr"
@@ -1893,7 +2017,7 @@ and u_tycon_objmodel_data st =
 and u_attribs_ext extraf st = u_list_ext extraf u_attrib st
 and u_unioncase_spec st = 
     let a = u_rfield_table  st
-    let b = u_typ st
+    let b = u_ty st
     let c = u_string st
     let d = u_ident  st
     // The XmlDoc is only present in the extended in-memory format. We detect its presence using a marker bit here
@@ -1921,7 +2045,7 @@ and u_exnc_repr st =
     | 3 -> TExnNone
     | _ -> ufailwith st "u_exnc_repr"
   
-and u_exnc_spec st = u_tycon_spec st
+and u_exnc_spec st = u_entity_spec st
 
 and u_access st = 
     match u_list u_cpath st with 
@@ -1931,7 +2055,7 @@ and u_access st =
 and u_recdfield_spec st = 
     let a = u_bool st
     let b = u_bool st
-    let c1 = u_typ st
+    let c1 = u_ty st
     let c2 = u_bool st
     let c2b = u_bool st
     let c3 = u_option u_const st
@@ -1953,14 +2077,15 @@ and u_recdfield_spec st =
       rfield_xmldoc= defaultArg xmldoc XmlDoc.Empty
       rfield_xmldocsig=f 
       rfield_access=g
+      rfield_name_generated = false
       rfield_other_range = None }
 
 and u_rfield_table st = MakeRecdFieldsTable (u_list u_recdfield_spec st)
 
 and u_entity_spec_data st : Entity = 
-    let x1,x2a,x2b,x2c,x3,(x4a,x4b),x6,x7f,x8,x9,x10,x10b,x11,x12,x13,x14,x15 = 
+    let x1,x2a,x2b,x2c,x3,(x4a,x4b),x6,x7f,x8,x9,_x10,x10b,x11,x12,x13,x14,x15 = 
        u_tup17
-          u_typar_specs
+          u_tyar_specs
           u_string
           (u_option u_string)
           u_range
@@ -1968,7 +2093,7 @@ and u_entity_spec_data st : Entity =
           (u_tup2 u_access u_access)
           u_attribs
           u_tycon_repr
-          (u_option u_typ) 
+          (u_option u_ty) 
           u_tcaug 
           u_string 
           u_kind
@@ -1985,25 +2110,20 @@ and u_entity_spec_data st : Entity =
     { entity_typars=LazyWithContext.NotLazy x1
       entity_stamp=newStamp()
       entity_logical_name=x2a
-      entity_compiled_name=x2b
       entity_range=x2c
-      entity_other_range=None
       entity_pubpath=x3
-      entity_accessiblity=x4a
-      entity_tycon_repr_accessibility=x4b
       entity_attribs=x6
       entity_tycon_repr=x7
-      entity_tycon_abbrev=x8
       entity_tycon_tcaug=x9
-      entity_xmldoc= defaultArg x15 XmlDoc.Empty
-      entity_xmldocsig=x10
-      entity_kind=x10b
       entity_flags=EntityFlags(x11)
       entity_cpath=x12
       entity_modul_contents=MaybeLazy.Lazy x13
-      entity_exn_info=x14
       entity_il_repr_cache=newCache()  
-      } 
+      entity_opt_data=
+        match x2b, x10b, x15, x8, x4a, x4b, x14 with
+        | None, TyparKind.Type, None, None, TAccess [], TAccess [], TExnNone -> None
+        | _ -> Some { Entity.EmptyEntityOptData with entity_compiled_name = x2b; entity_kind = x10b; entity_xmldoc= defaultArg x15 XmlDoc.Empty; entity_xmldocsig = System.String.Empty; entity_tycon_abbrev = x8; entity_accessiblity = x4a; entity_tycon_repr_accessibility = x4b; entity_exn_info = x14 }
+    } 
 
 and u_tcaug st = 
     let a1,a2,a3,b2,c,d,e,g,_space = 
@@ -2013,8 +2133,8 @@ and u_tcaug st =
         (u_option (u_tup3 u_vref u_vref u_vref))
         (u_option (u_tup2 u_vref u_vref))
         (u_list (u_tup2 u_string u_vref))
-        (u_list (u_tup3 u_typ u_bool u_dummy_range)) 
-        (u_option u_typ)
+        (u_list (u_tup3 u_ty u_bool u_dummy_range)) 
+        (u_option u_ty)
         u_bool 
         (u_space 1)
         st 
@@ -2032,8 +2152,8 @@ and u_tcaug st =
      tcaug_closed=true 
      tcaug_abstract=g}
  
-and u_tycon_spec st = 
-    u_osgn_decl st.itycons u_entity_spec_data st 
+and u_entity_spec st = 
+    u_osgn_decl st.ientities u_entity_spec_data st 
 
 and u_parentref st = 
     let tag = u_byte st
@@ -2058,12 +2178,12 @@ and u_attrib_expr st =
     AttribExpr(a,b)
 
 and u_attrib_arg st  = 
-    let a,b,c,d = u_tup4 u_string u_typ u_bool u_attrib_expr st 
+    let a,b,c,d = u_tup4 u_string u_ty u_bool u_attrib_expr st 
     AttribNamedArg(a,b,c,d)
 
 and u_member_info st : ValMemberInfo = 
     let x2,x3,x4,x5 = u_tup4 u_tcref u_MemberFlags (u_list u_slotsig) u_bool st
-    { ApparentParent=x2
+    { ApparentEnclosingEntity=x2
       MemberFlags=x3
       ImplementedSlotSigs=x4
       IsImplemented=x5  }
@@ -2099,7 +2219,7 @@ and u_vrefFlags st =
     | 0 -> NormalValUse 
     | 1 -> CtorValUsedAsSuperInit
     | 2 -> CtorValUsedAsSelfInit
-    | 3 -> PossibleConstrainedCall (u_typ st)
+    | 3 -> PossibleConstrainedCall (u_ty st)
     | 4 -> VSlotDirectCall
     | _ -> ufailwith st "u_vrefFlags"
 
@@ -2109,7 +2229,7 @@ and u_ValData st =
         u_string
         (u_option u_string)
         u_ranges
-        u_typ 
+        u_ty 
         u_int64
         (u_option u_member_info) 
         u_attribs 
@@ -2120,22 +2240,27 @@ and u_ValData st =
         (u_option u_const) 
         (u_used_space1 u_xmldoc)
         st
-    { val_logical_name=x1
-      val_compiled_name=x1z
-      val_range=(match x1a with None -> range0 | Some(a,_) -> a)
-      val_other_range=(match x1a with None -> None | Some(_,b) -> Some(b,true))
-      val_type=x2
-      val_stamp=newStamp()
-      val_flags=ValFlags(x4)
-      val_defn = None
-      val_member_info=x8
-      val_attribs=x9
-      val_repr_info=x10
-      val_xmldoc= defaultArg x15 XmlDoc.Empty
-      val_xmldocsig=x12
-      val_access=x13
-      val_actual_parent=x13b
-      val_const=x14
+
+    { val_logical_name = x1
+      val_range        = (match x1a with None -> range0 | Some(a,_) -> a)
+      val_type         = x2
+      val_stamp        = newStamp()
+      val_flags        = ValFlags(x4)
+      val_opt_data     =
+          match x1z, x1a, x10, x14, x13, x15, x8, x13b, x12, x9 with
+          | None, None, None, None, TAccess [], None, None, ParentNone, "", [] -> None
+          | _ -> 
+              Some { val_compiled_name    = x1z
+                     val_other_range      = (match x1a with None -> None | Some(_,b) -> Some(b,true))
+                     val_defn             = None
+                     val_repr_info        = x10
+                     val_const            = x14
+                     val_access           = x13
+                     val_xmldoc           = defaultArg x15 XmlDoc.Empty
+                     val_member_info      = x8
+                     val_declaring_entity = x13b
+                     val_xmldocsig        = x12
+                     val_attribs          = x9 }
     }
 
 and u_Val st = u_osgn_decl st.ivals u_ValData st 
@@ -2146,7 +2271,7 @@ and u_modul_typ st =
         u_tup3
           u_istype
           (u_qlist u_Val)
-          (u_qlist u_tycon_spec) st
+          (u_qlist u_entity_spec) st
     ModuleOrNamespaceType(x1,x3,x5)
 
 
@@ -2209,18 +2334,18 @@ and p_dtree_case (TCase(a,b)) st = p_tup2 p_dtree_discrim p_dtree (a,b) st
 
 and p_dtree_discrim x st = 
     match x with 
-    | DecisionTreeTest.UnionCase (ucref,tinst) -> p_byte 0 st; p_tup2 p_ucref p_typs (ucref,tinst) st
+    | DecisionTreeTest.UnionCase (ucref,tinst) -> p_byte 0 st; p_tup2 p_ucref p_tys (ucref,tinst) st
     | DecisionTreeTest.Const c                   -> p_byte 1 st; p_const c st
     | DecisionTreeTest.IsNull                    -> p_byte 2 st
-    | DecisionTreeTest.IsInst (srcty,tgty)       -> p_byte 3 st; p_typ srcty st; p_typ tgty st
-    | DecisionTreeTest.ArrayLength (n,ty)       -> p_byte 4 st; p_tup2 p_int p_typ (n,ty) st
+    | DecisionTreeTest.IsInst (srcty,tgty)       -> p_byte 3 st; p_ty srcty st; p_ty tgty st
+    | DecisionTreeTest.ArrayLength (n,ty)       -> p_byte 4 st; p_tup2 p_int p_ty (n,ty) st
     | DecisionTreeTest.ActivePatternCase _                   -> pfailwith st "DecisionTreeTest.ActivePatternCase: only used during pattern match compilation"
 
 and p_target (TTarget(a,b,_)) st = p_tup2 p_Vals p_expr (a,b) st
 and p_bind (TBind(a,b,_)) st = p_tup2 p_Val p_expr (a,b) st
 
 and p_lval_op_kind x st =
-    p_byte (match x with LGetAddr -> 0 | LByrefGet -> 1 | LSet -> 2 | LByrefSet -> 3) st
+    p_byte (match x with LAddrOf _ -> 0 | LByrefGet -> 1 | LSet -> 2 | LByrefSet -> 3) st
 
 and p_recdInfo x st = 
     match x with 
@@ -2240,11 +2365,11 @@ and u_dtree_case st = let a,b = u_tup2 u_dtree_discrim u_dtree st in (TCase(a,b)
 and u_dtree_discrim st = 
     let tag = u_byte st
     match tag with
-    | 0 -> u_tup2 u_ucref u_typs st |> DecisionTreeTest.UnionCase 
+    | 0 -> u_tup2 u_ucref u_tys st |> DecisionTreeTest.UnionCase 
     | 1 -> u_const st               |> DecisionTreeTest.Const 
     | 2 ->                             DecisionTreeTest.IsNull 
-    | 3 -> u_tup2 u_typ u_typ st    |> DecisionTreeTest.IsInst
-    | 4 -> u_tup2 u_int u_typ st    |> DecisionTreeTest.ArrayLength
+    | 3 -> u_tup2 u_ty u_ty st    |> DecisionTreeTest.IsInst
+    | 4 -> u_tup2 u_int u_ty st    |> DecisionTreeTest.ArrayLength
     | _ -> ufailwith st "u_dtree_discrim" 
 
 and u_target st = let a,b = u_tup2 u_Vals u_expr st in (TTarget(a,b,SuppressSequencePointAtTarget)) 
@@ -2253,7 +2378,7 @@ and u_bind st = let a = u_Val st in let b = u_expr st in TBind(a,b,NoSequencePoi
 
 and u_lval_op_kind st =
     match u_byte st with 
-    | 0 -> LGetAddr 
+    | 0 -> LAddrOf false
     | 1 -> LByrefGet 
     | 2 -> LSet 
     | 3 -> LByrefSet 
@@ -2282,26 +2407,30 @@ and p_op x st =
               p_byte 30 st; p_int a st
          else 
               p_byte 11 st; p_int a st
-    | TOp.ILAsm (a,b)                -> p_byte 12 st; p_tup2 (p_list p_ILInstr) p_typs (a,b) st
-    | TOp.RefAddrGet                 -> p_byte 13 st
+    | TOp.ILAsm (a,b)      -> p_byte 12 st; p_tup2 (p_list p_ILInstr) p_tys (a,b) st
+    | TOp.RefAddrGet _               -> p_byte 13 st
     | TOp.UnionCaseProof (a)         -> p_byte 14 st; p_ucref a st
     | TOp.Coerce                     -> p_byte 15 st
     | TOp.TraitCall (b)              -> p_byte 16 st; p_trait b st
     | TOp.LValueOp (a,b)             -> p_byte 17 st; p_tup2 p_lval_op_kind (p_vref "lval") (a,b) st
     | TOp.ILCall (a1,a2,a3,a4,a5,a7,a8,a9,b,c,d)          
-                                     -> p_byte 18 st; p_tup11 p_bool p_bool p_bool p_bool p_vrefFlags p_bool p_bool p_ILMethodRef p_typs p_typs p_typs (a1,a2,a3,a4,a5,a7,a8,a9,b,c,d) st
+                                     -> p_byte 18 st; p_tup11 p_bool p_bool p_bool p_bool p_vrefFlags p_bool p_bool p_ILMethodRef p_tys p_tys p_tys (a1,a2,a3,a4,a5,a7,a8,a9,b,c,d) st
     | TOp.Array                      -> p_byte 19 st
     | TOp.While _                    -> p_byte 20 st
     | TOp.For(_,dir)                 -> p_byte 21 st; p_int (match dir with FSharpForLoopUp -> 0 | CSharpForLoopUp -> 1 | FSharpForLoopDown -> 2) st
     | TOp.Bytes bytes                -> p_byte 22 st; p_bytes bytes st
     | TOp.TryCatch _                 -> p_byte 23 st
     | TOp.TryFinally _               -> p_byte 24 st
-    | TOp.ValFieldGetAddr (a)        -> p_byte 25 st; p_rfref a st
+    | TOp.ValFieldGetAddr (a, _)     -> p_byte 25 st; p_rfref a st
     | TOp.UInt16s arr                -> p_byte 26 st; p_array p_uint16 arr st
     | TOp.Reraise                    -> p_byte 27 st
-    | TOp.UnionCaseFieldGetAddr (a,b) -> p_byte 28 st; p_tup2 p_ucref p_int (a,b) st
+    | TOp.UnionCaseFieldGetAddr (a,b, _) -> p_byte 28 st; p_tup2 p_ucref p_int (a,b) st
        // Note tag byte 29 is taken for struct tuples, see above
        // Note tag byte 30 is taken for struct tuples, see above
+    (* 29: TOp.Tuple when evalTupInfoIsStruct tupInfo = true *)
+    (* 30: TOp.TupleFieldGet  when evalTupInfoIsStruct tupInfo = true *)
+    | TOp.AnonRecd info   -> p_byte 31 st; p_anonInfo info st
+    | TOp.AnonRecdGet (info, n)   -> p_byte 32 st; p_anonInfo info st; p_int n st
     | TOp.Goto _ | TOp.Label _ | TOp.Return -> failwith "unexpected backend construct in pickled TAST"
 
 and u_op st = 
@@ -2335,9 +2464,9 @@ and u_op st =
     | 11 -> let a = u_int st
             TOp.TupleFieldGet (tupInfoRef, a) 
     | 12 -> let a = (u_list u_ILInstr) st
-            let b = u_typs st
+            let b = u_tys st
             TOp.ILAsm (a,b) 
-    | 13 -> TOp.RefAddrGet 
+    | 13 -> TOp.RefAddrGet false // ok to set the 'readonly' flag on these operands to false on re-read since the flag is only used for typechecking purposes
     | 14 -> let a = u_ucref st
             TOp.UnionCaseProof a 
     | 15 -> TOp.Coerce
@@ -2347,9 +2476,9 @@ and u_op st =
             let b = u_vref st
             TOp.LValueOp (a,b) 
     | 18 -> let (a1,a2,a3,a4,a5,a7,a8,a9) = (u_tup8 u_bool u_bool u_bool u_bool u_vrefFlags u_bool u_bool  u_ILMethodRef) st
-            let b = u_typs st
-            let c = u_typs st
-            let d = u_typs st
+            let b = u_tys st
+            let c = u_tys st
+            let d = u_tys st
             TOp.ILCall (a1,a2,a3,a4,a5,a7,a8,a9,b,c,d) 
     | 19 -> TOp.Array
     | 20 -> TOp.While (NoSequencePointAtWhileLoop, NoSpecialWhileLoopMarker)
@@ -2359,48 +2488,53 @@ and u_op st =
     | 23 -> TOp.TryCatch(NoSequencePointAtTry,NoSequencePointAtWith)
     | 24 -> TOp.TryFinally(NoSequencePointAtTry,NoSequencePointAtFinally)
     | 25 -> let a = u_rfref st
-            TOp.ValFieldGetAddr a
+            TOp.ValFieldGetAddr (a, false)
     | 26 -> TOp.UInt16s (u_array u_uint16 st)
     | 27 -> TOp.Reraise
     | 28 -> let a = u_ucref st
             let b = u_int st
-            TOp.UnionCaseFieldGetAddr (a,b) 
+            TOp.UnionCaseFieldGetAddr (a,b, false) 
     | 29 -> TOp.Tuple tupInfoStruct
     | 30 -> let a = u_int st
             TOp.TupleFieldGet (tupInfoStruct, a) 
+    | 31 -> let info = u_anonInfo st 
+            TOp.AnonRecd (info)   
+    | 32 -> let info = u_anonInfo st 
+            let n = u_int st 
+            TOp.AnonRecdGet (info, n)   
     | _ -> ufailwith st "u_op" 
 
 and p_expr expr st = 
     match expr with 
     | Expr.Link e -> p_expr !e st
-    | Expr.Const (x,m,ty)              -> p_byte 0 st; p_tup3 p_const p_dummy_range p_typ (x,m,ty) st
+    | Expr.Const (x,m,ty)              -> p_byte 0 st; p_tup3 p_const p_dummy_range p_ty (x,m,ty) st
     | Expr.Val (a,b,m)                 -> p_byte 1 st; p_tup3 (p_vref "val") p_vrefFlags p_dummy_range (a,b,m) st
-    | Expr.Op(a,b,c,d)                 -> p_byte 2 st; p_tup4 p_op  p_typs p_Exprs p_dummy_range (a,b,c,d) st
+    | Expr.Op(a,b,c,d)                 -> p_byte 2 st; p_tup4 p_op  p_tys p_Exprs p_dummy_range (a,b,c,d) st
     | Expr.Sequential (a,b,c,_,d)      -> p_byte 3 st; p_tup4 p_expr p_expr p_int p_dummy_range (a,b,(match c with NormalSeq -> 0 | ThenDoSeq -> 1),d) st
-    | Expr.Lambda (_,a1,b0,b1,c,d,e)   -> p_byte 4 st; p_tup6 (p_option p_Val) (p_option p_Val) p_Vals p_expr p_dummy_range p_typ (a1,b0,b1,c,d,e) st
-    | Expr.TyLambda (_,b,c,d,e)        -> p_byte 5 st; p_tup4 p_typar_specs p_expr p_dummy_range p_typ (b,c,d,e) st
-    | Expr.App (a1,a2,b,c,d)           -> p_byte 6 st; p_tup5 p_expr p_typ p_typs p_Exprs p_dummy_range (a1,a2,b,c,d) st
+    | Expr.Lambda (_,a1,b0,b1,c,d,e)   -> p_byte 4 st; p_tup6 (p_option p_Val) (p_option p_Val) p_Vals p_expr p_dummy_range p_ty (a1,b0,b1,c,d,e) st
+    | Expr.TyLambda (_,b,c,d,e)        -> p_byte 5 st; p_tup4 p_tyar_specs p_expr p_dummy_range p_ty (b,c,d,e) st
+    | Expr.App (a1,a2,b,c,d)           -> p_byte 6 st; p_tup5 p_expr p_ty p_tys p_Exprs p_dummy_range (a1,a2,b,c,d) st
     | Expr.LetRec (a,b,c,_)            -> p_byte 7 st; p_tup3 p_binds p_expr p_dummy_range (a,b,c) st
     | Expr.Let (a,b,c,_)               -> p_byte 8 st; p_tup3 p_bind p_expr p_dummy_range (a,b,c) st
-    | Expr.Match (_,a,b,c,d,e)         -> p_byte 9 st; p_tup5 p_dummy_range p_dtree p_targets p_dummy_range p_typ (a,b,c,d,e) st
-    | Expr.Obj(_,b,c,d,e,f,g)          -> p_byte 10 st; p_tup6 p_typ (p_option p_Val) p_expr p_methods p_intfs p_dummy_range (b,c,d,e,f,g) st
+    | Expr.Match (_,a,b,c,d,e)         -> p_byte 9 st; p_tup5 p_dummy_range p_dtree p_targets p_dummy_range p_ty (a,b,c,d,e) st
+    | Expr.Obj(_,b,c,d,e,f,g)          -> p_byte 10 st; p_tup6 p_ty (p_option p_Val) p_expr p_methods p_intfs p_dummy_range (b,c,d,e,f,g) st
     | Expr.StaticOptimization(a,b,c,d) -> p_byte 11 st; p_tup4 p_constraints p_expr p_expr p_dummy_range (a,b,c,d) st
-    | Expr.TyChoose (a,b,c)            -> p_byte 12 st; p_tup3 p_typar_specs p_expr p_dummy_range (a,b,c) st
-    | Expr.Quote(ast,_,_,m,ty)         -> p_byte 13 st; p_tup3 p_expr p_dummy_range p_typ (ast,m,ty) st
+    | Expr.TyChoose (a,b,c)            -> p_byte 12 st; p_tup3 p_tyar_specs p_expr p_dummy_range (a,b,c) st
+    | Expr.Quote(ast,_,_,m,ty)         -> p_byte 13 st; p_tup3 p_expr p_dummy_range p_ty (ast,m,ty) st
 
 and u_expr st = 
     let tag = u_byte st
     match tag with
     | 0 -> let a = u_const st
            let b = u_dummy_range st
-           let c = u_typ st
+           let c = u_ty st
            Expr.Const (a,b,c) 
     | 1 -> let a = u_vref st
            let b = u_vrefFlags st
            let c = u_dummy_range st
            Expr.Val (a,b,c) 
     | 2 -> let a = u_op st
-           let b = u_typs st
+           let b = u_tys st
            let c = u_Exprs st
            let d = u_dummy_range st
            Expr.Op (a,b,c,d)
@@ -2414,16 +2548,16 @@ and u_expr st =
            let b1 = u_Vals st
            let c = u_expr st
            let d = u_dummy_range st
-           let e = u_typ st
+           let e = u_ty st
            Expr.Lambda (newUnique(),a0,b0,b1,c,d,e) 
-    | 5  -> let b = u_typar_specs st
+    | 5  -> let b = u_tyar_specs st
             let c = u_expr st
             let d = u_dummy_range st
-            let e = u_typ st
+            let e = u_ty st
             Expr.TyLambda (newUnique(),b,c,d,e) 
     | 6 ->  let a1 = u_expr st
-            let a2 = u_typ st
-            let b = u_typs st
+            let a2 = u_ty st
+            let b = u_tys st
             let c = u_Exprs st
             let d = u_dummy_range st
             Expr.App (a1,a2,b,c,d) 
@@ -2439,9 +2573,9 @@ and u_expr st =
             let b = u_dtree st
             let c = u_targets st
             let d = u_dummy_range st
-            let e = u_typ st
+            let e = u_ty st
             Expr.Match (NoSequencePointAtStickyBinding,a,b,c,d,e) 
-    | 10 -> let b = u_typ st
+    | 10 -> let b = u_ty st
             let c = (u_option u_Val) st
             let d = u_expr st
             let e = u_methods st
@@ -2453,50 +2587,50 @@ and u_expr st =
             let c = u_expr st
             let d = u_dummy_range st
             Expr.StaticOptimization (a,b,c,d)
-    | 12 -> let a = u_typar_specs st
+    | 12 -> let a = u_tyar_specs st
             let b = u_expr st
             let c = u_dummy_range st
             Expr.TyChoose (a,b,c)
     | 13 -> let b = u_expr st
             let c = u_dummy_range st
-            let d = u_typ st
+            let d = u_ty st
             Expr.Quote (b,ref None,false,c,d) // isFromQueryExpression=false
     | _ -> ufailwith st "u_expr" 
 
 and p_static_optimization_constraint x st = 
     match x with
-    | TTyconEqualsTycon (a,b) -> p_byte 0 st; p_tup2 p_typ p_typ (a,b) st
-    | TTyconIsStruct(a) -> p_byte 1 st; p_typ a st
+    | TTyconEqualsTycon (a,b) -> p_byte 0 st; p_tup2 p_ty p_ty (a,b) st
+    | TTyconIsStruct(a) -> p_byte 1 st; p_ty a st
 
-and p_slotparam (TSlotParam (a,b,c,d,e,f)) st = p_tup6 (p_option p_string) p_typ p_bool p_bool p_bool p_attribs (a,b,c,d,e,f) st
-and p_slotsig (TSlotSig (a,b,c,d,e,f)) st = p_tup6 p_string p_typ p_typar_specs p_typar_specs (p_list (p_list p_slotparam)) (p_option p_typ) (a,b,c,d,e,f) st
-and p_method (TObjExprMethod (a,b,c,d,e,f)) st = p_tup6 p_slotsig p_attribs p_typar_specs (p_list p_Vals) p_expr p_dummy_range (a,b,c,d,e,f) st 
+and p_slotparam (TSlotParam (a,b,c,d,e,f)) st = p_tup6 (p_option p_string) p_ty p_bool p_bool p_bool p_attribs (a,b,c,d,e,f) st
+and p_slotsig (TSlotSig (a,b,c,d,e,f)) st = p_tup6 p_string p_ty p_tyar_specs p_tyar_specs (p_list (p_list p_slotparam)) (p_option p_ty) (a,b,c,d,e,f) st
+and p_method (TObjExprMethod (a,b,c,d,e,f)) st = p_tup6 p_slotsig p_attribs p_tyar_specs (p_list p_Vals) p_expr p_dummy_range (a,b,c,d,e,f) st 
 and p_methods x st = p_list p_method x st
-and p_intf x st = p_tup2 p_typ p_methods x st
+and p_intf x st = p_tup2 p_ty p_methods x st
 and p_intfs x st = p_list p_intf x st
 
 and u_static_optimization_constraint st = 
     let tag = u_byte st
     match tag with
-    | 0 -> u_tup2 u_typ u_typ st |> TTyconEqualsTycon
-    | 1 -> u_typ              st |> TTyconIsStruct
+    | 0 -> u_tup2 u_ty u_ty st |> TTyconEqualsTycon
+    | 1 -> u_ty              st |> TTyconIsStruct
     | _ -> ufailwith st "u_static_optimization_constraint" 
 
 and u_slotparam st = 
-    let a,b,c,d,e,f = u_tup6 (u_option u_string) u_typ u_bool u_bool u_bool u_attribs st 
+    let a,b,c,d,e,f = u_tup6 (u_option u_string) u_ty u_bool u_bool u_bool u_attribs st 
     TSlotParam(a,b,c,d,e,f)
 
 and u_slotsig st = 
-    let a,b,c,d,e,f = u_tup6 u_string u_typ u_typar_specs u_typar_specs (u_list (u_list u_slotparam)) (u_option u_typ) st
+    let a,b,c,d,e,f = u_tup6 u_string u_ty u_tyar_specs u_tyar_specs (u_list (u_list u_slotparam)) (u_option u_ty) st
     TSlotSig(a,b,c,d,e,f)
 
 and u_method st = 
-    let a,b,c,d,e,f = u_tup6 u_slotsig u_attribs u_typar_specs (u_list u_Vals) u_expr u_dummy_range st 
+    let a,b,c,d,e,f = u_tup6 u_slotsig u_attribs u_tyar_specs (u_list u_Vals) u_expr u_dummy_range st 
     TObjExprMethod(a,b,c,d,e,f)
 
 and u_methods st = u_list u_method st
 
-and u_intf st = u_tup2 u_typ u_methods st
+and u_intf st = u_tup2 u_ty u_methods st
 
 and u_intfs st = u_list u_intf st
 
@@ -2521,11 +2655,12 @@ let _ = fill_u_Vals (u_list u_Val)
 // Pickle/unpickle F# interface data 
 //---------------------------------------------------------------------------
 
-let pickleModuleOrNamespace mspec st = p_tycon_spec mspec st
-let pickleCcuInfo minfo st = 
+let pickleModuleOrNamespace mspec st = p_entity_spec mspec st
+
+let pickleCcuInfo (minfo: PickledCcuInfo) st = 
     p_tup4 pickleModuleOrNamespace p_string p_bool (p_space 3) (minfo.mspec, minfo.compileTimeWorkingDir, minfo.usesQuotations,()) st
 
-let unpickleModuleOrNamespace st = u_tycon_spec st 
+let unpickleModuleOrNamespace st = u_entity_spec st 
   
 let unpickleCcuInfo st = 
     let a,b,c,_space = u_tup4 unpickleModuleOrNamespace u_string u_bool (u_space 3) st 

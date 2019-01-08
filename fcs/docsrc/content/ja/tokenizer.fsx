@@ -1,5 +1,5 @@
 (*** hide ***)
-#I "../../../bin/v4.5/"
+#I "../../../../debug/bin/net45/"
 (**
 コンパイラサービス：F#トークナイザを使用する
 ============================================
@@ -73,7 +73,7 @@ let rec tokenizeLine (tokenizer:FSharpLineTokenizer) state =
 必要となるような新しい状態を返します。
 初期値としては `0L` を指定します:
 *)
-tokenizeLine tokenizer 0L
+tokenizeLine tokenizer FSharpTokenizerLexState.Initial
 (**
 この結果は LET WHITESPACE IDENT EQUALS INT32 という
 トークン名のシーケンスになります。

@@ -238,6 +238,8 @@ rule token args skip = parse
      { YIELD_BANG(true)  } 
  | "return!" 
      { YIELD_BANG(false) } 
+ | "match!"
+     { MATCH_BANG }
  | ident '!' 
      { let tok = Keywords.KeywordOrIdentifierToken args lexbuf (lexemeTrimRight lexbuf 1) 
        match tok with 
@@ -560,11 +562,13 @@ rule token args skip = parse
  | "=" { EQUALS }
  | "[" { LBRACK }
  | "[|" { LBRACK_BAR }
+ | "{|" { LBRACE_BAR }
  | "<" { LESS false }
  | ">" { GREATER false }
  | "[<" { LBRACK_LESS }
  | "]" { RBRACK }
  | "|]" { BAR_RBRACK }
+ | "|}" { BAR_RBRACE }
  | ">]" { GREATER_RBRACK }
  | "{" { LBRACE }
  | "|" { BAR }

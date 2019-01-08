@@ -43,13 +43,13 @@ module internal Salsa =
             { new System.IDisposable with
                     member this.Dispose() = actuallyBuild <- true }
         member th.Results = capturedFlags, capturedSources
-        member th.Compile(compile:System.Converter<int,int>, flags:string[], sources:string[]) = 
+        member th.Compile(compile:System.Func<int>, flags:string[], sources:string[]) =
             capturedFlags <- flags 
             capturedSources <- sources
             if actuallyBuild then
-                compile.Invoke(0)
+                compile.Invoke()
             else
-                0         
+                0
         interface ITaskHost
         
     type BuildResult = {
@@ -93,9 +93,10 @@ module internal Salsa =
                     | null ->
                         let project = GlobalEngine().LoadProject(projectFileName)
                         // Set global properties.
-                        SetGlobalProperty(project,"BuildingInsideVisualStudio", "true")
-                        SetGlobalProperty(project,"Configuration", configuration)
-                        SetGlobalProperty(project,"Platform", platform)
+                        SetGlobalProperty(project, "AssemblySearchPaths", "{HintPathFromItem};{TargetFrameworkDirectory};{RawFileName}")
+                        SetGlobalProperty(project, "BuildingInsideVisualStudio", "true")
+                        SetGlobalProperty(project, "Configuration", configuration)
+                        SetGlobalProperty(project, "Platform", platform)
                         let prjColl = project.ProjectCollection
                         let hostSvc = prjColl.HostServices
                         let theHostObject = HostCompile()   
@@ -109,7 +110,7 @@ module internal Salsa =
                         | false, _ ->
                             project, false, Unchecked.defaultof<_>  // this code path is hit when unit-testing the project system, which uses its own HostObject
                 with e->
-                    printfn "Failed in MSBuild GetProject getting '%s'.\n" projectFileName 
+                    printfn "Failed in MSBuild GetProject getting '%s'.\n" projectFileName
                     raise e
             project, justCreated, theHostObject
 
@@ -146,7 +147,7 @@ module internal Salsa =
             printfn "build succeeded? %A" buildResult
             let mainassembly = 
                 try
-                    (projectInstance.GetItems("MainAssembly") |> Seq.head).EvaluatedInclude
+                    (projectInstance.GetItems("TargetFileName") |> Seq.head).EvaluatedInclude
                 with e ->
                     ""  // TODO it seems like Dev10 "Clean" target does not produce this output, but this result is not consumed by those tests in an interesting way anyway
             printfn "mainAssembly: %A" mainassembly 
@@ -240,7 +241,7 @@ module internal Salsa =
         let mutable prevConfig = ""
         let mutable prevPlatform = ""
         let GetFlags() = 
-            let newtimestamp = File.GetLastWriteTime(projectfile)
+            let newtimestamp = File.GetLastWriteTimeUtc(projectfile)
             let curConfig = configurationFunc()
             let curPlatform = platformFunc()
             if timestamp <> newtimestamp 
@@ -632,9 +633,11 @@ module internal Salsa =
             Append "        <OutputPath>bin\Debug\</OutputPath>"
             if versionFile<>null then Append (sprintf "        <VersionFile>%s</VersionFile>" versionFile)
             if otherFlags<>null then Append (sprintf "        <OtherFlags>%s --resolutions</OtherFlags>" otherFlags)
-            if targetFrameworkVersion<>null then
-                Append(sprintf "       <AllowCrossTargeting>true</AllowCrossTargeting>")
-                Append(sprintf "       <TargetFrameworkVersion>%s</TargetFrameworkVersion>" targetFrameworkVersion)
+//            if targetFrameworkVersion<>null then
+//                Append(sprintf "       <AllowCrossTargeting>true</AllowCrossTargeting>")
+//                Append(sprintf "       <TargetFrameworkVersion>%s</TargetFrameworkVersion>" targetFrameworkVersion)
+//            else
+            Append(sprintf "       <TargetFrameworkVersion>%s</TargetFrameworkVersion>" "4.6.1")
             Append "        <NoWarn>"
             for disabledWarning in disabledWarnings do
                 Append (sprintf "            %s;" disabledWarning)                            

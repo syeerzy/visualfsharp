@@ -10,15 +10,9 @@ open Microsoft.FSharp.Core.Printf
 
 #nowarn "62" // This construct is for ML compatibility.
 
-#if COMPILER_PUBLIC_API
 type layout = Internal.Utilities.StructuredFormat.Layout
 type LayoutTag = Internal.Utilities.StructuredFormat.LayoutTag
 type TaggedText = Internal.Utilities.StructuredFormat.TaggedText
-#else
-type internal layout = Internal.Utilities.StructuredFormat.Layout
-type internal LayoutTag = Internal.Utilities.StructuredFormat.LayoutTag
-type internal TaggedText = Internal.Utilities.StructuredFormat.TaggedText
-#endif
 
 type NavigableTaggedText(taggedText: TaggedText, range: Range.range) =
     member val Range = range
@@ -115,6 +109,8 @@ module TaggedTextOps =
         let rightBracket = Internal.Utilities.StructuredFormat.TaggedTextOps.Literals.rightBracket
         let leftBrace = Internal.Utilities.StructuredFormat.TaggedTextOps.Literals.leftBrace
         let rightBrace = Internal.Utilities.StructuredFormat.TaggedTextOps.Literals.rightBrace
+        let leftBraceBar = Internal.Utilities.StructuredFormat.TaggedTextOps.Literals.leftBraceBar
+        let rightBraceBar = Internal.Utilities.StructuredFormat.TaggedTextOps.Literals.rightBraceBar
         let equals = Internal.Utilities.StructuredFormat.TaggedTextOps.Literals.equals
         let arrow = Internal.Utilities.StructuredFormat.TaggedTextOps.Literals.arrow
         let questionMark = Internal.Utilities.StructuredFormat.TaggedTextOps.Literals.questionMark
